@@ -1122,6 +1122,9 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 	char *base, *end;
 	PE_COFF_LOADER_IMAGE_CONTEXT context;
 
+	void *text_base=0;
+	void *data_base=0;
+
 	/*
 	 * The binary header contains relevant context and section pointers
 	 */
@@ -1179,6 +1182,7 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 		base = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress);
 		end = ImageAddress (buffer, context.ImageSize, Section->VirtualAddress + size - 1);
 
+
 		/* We do want to process .reloc, but it's often marked
 		 * discardable, so we don't want to memcpy it. */
 		if (CompareMem(Section->Name, ".reloc\0\0", 8) == 0) {
@@ -1219,6 +1223,15 @@ static EFI_STATUS handle_image (void *data, unsigned int datasize,
 
 		if (size < Section->Misc.VirtualSize)
 			ZeroMem (base + size, Section->Misc.VirtualSize - size);
+
+		if (CompareMem(Section->Name, ".text\0\0\0", 8) == 0)
+			text_base = base;
+		if (CompareMem(Section->Name, ".data\0\0\0", 8) == 0)
+			data_base = base;
+		if (text_base and data_base) {
+			Print(L"add-symbol-file /usr/lib/debug/usr/lib/grub/i386-efi/kernel.img.debug 0x%08x -s .data 0x%08x\n", text_base, data_base);
+			uefi_call_wrapper(BS->Stall, 1, 2000000);
+		}
 	}
 
 	if (context.NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC) {
